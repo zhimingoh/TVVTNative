@@ -1,0 +1,12 @@
+# Local build artifacts and runtime data
+/build/
+*.log
+.DS_Store
+
+# Local editor configuration
+.vscode/
+.idea/
+
+# Local credentials and environment overrides
+.env
+.env.*
