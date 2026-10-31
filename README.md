@@ -14,6 +14,10 @@
 
 因此，我分析了小程序的 BLE 通信协议，用 **SwiftUI + CoreBluetooth** 实现了这个独立的 macOS 原生控制器。实测已经能够在 Mac 上连接散热器、读取状态、发送制冷设置并收到成功确认。
 
+### 最新版本：0.2.1
+
+新增菜单栏温度与双模式控制、设备记忆和自动重连、系统登录启动，以及固定本机签名与安装流程。已在 M2 Mac 和 T23SS 上验证更新后保留蓝牙授权、自动重连和控制确认；实际注销登录、睡眠恢复及完整异常界面验证仍待完成。
+
 ### 功能
 
 - Mac 顶部菜单栏显示本机芯片温度、连接状态和当前模式，点击即可切换“全速前进 / 自动模式”。
@@ -25,7 +29,7 @@
 - 设置手动、低功耗、智能、强冷模式，以及功率、风扇档位和智能温度。
 - 设置灯效、RGB 颜色、亮度、速度、风扇灯和侧灯开关。
 - 显示连接和控制日志；分别处理蓝牙写入与设备协议确认。
-- 无需微信、浏览器、Python、云服务或账号。
+- 应用运行无需微信、浏览器、Python、云服务或账号；首次本机签名配置使用 Python 3 和 OpenSSL 3+。
 
 ### 支持与验证范围
 
@@ -34,6 +38,9 @@
 | MacBook Air、Apple Silicon、macOS 26 | 已实测构建、启动、蓝牙扫描和连接 |
 | T23SS / M2023-S | 已实测状态读取和制冷指令成功确认 |
 | T23DD / M2023-D | 已实现服务匹配，尚未实测 |
+| M2 本机温度与双模式 | 已实测温度采集、全速与自动控制确认 |
+| 固定签名更新与自动重连 | 已实测 0.2.0 → 0.2.1 更新后无需再次蓝牙授权并重连 |
+| 登录启动 / 睡眠唤醒恢复 | 已实现；实际注销登录与睡眠恢复尚未验证 |
 | 灯光控制 | 已实现，尚未逐项验证实际灯效 |
 | 其他 Mac / macOS 版本 | 尚未验证 |
 
@@ -41,7 +48,7 @@
 
 ### 构建与测试
 
-需要 macOS 和 Xcode Command Line Tools。当前脚本使用本机架构与本机 SDK 构建；已验证的环境为 Apple Silicon + macOS 26。
+需要 macOS 14 或更新版本和 Xcode Command Line Tools。当前脚本使用本机架构与本机 SDK 构建；已验证的环境为 Apple Silicon + macOS 26。
 
 ```sh
 # 若尚未安装命令行工具
@@ -56,6 +63,8 @@ cd TVVTNative
 ./test.sh
 open 'build/TVVT 散热器.app'
 ```
+
+首次本机签名配置还需要 Python 3 和 OpenSSL 3+（`openssl version` 应显示 3 或更新版本；macOS 自带的 LibreSSL 不适用）。
 
 未配置本机证书时，构建使用临时签名（ad hoc），重新构建可能触发再次授权。日常使用建议配置固定的本机代码签名证书并安装到固定位置：
 
@@ -132,7 +141,9 @@ Sources/Protocol.swift   控制帧、状态解析与 BLE 分片处理
 Tests/main.swift         协议测试
 Tests/reference.json     原序列化函数生成的协议测试向量
 build.sh                 构建并签名本机应用
-test.sh                  编译并运行协议测试
+install.sh               固定签名构建并更新 /Applications 中的应用
+scripts/setup-signing.py 首次创建并复用本机签名身份
+test.sh                  运行协议、温控及连接状态机测试
 ```
 
 ## English
@@ -145,6 +156,10 @@ My initial attempt to use the “TVVT散热器” Mini Program in WeChat for Mac
 
 I therefore analyzed its BLE protocol and built an independent native macOS controller using **SwiftUI and CoreBluetooth**. Testing on real hardware confirmed that the Mac can connect to the cooler, read status, send cooling settings and receive a successful device acknowledgement.
 
+### Latest version: 0.2.1
+
+Adds menu bar temperature and two-mode cooling control, device persistence and automatic reconnect, login startup, and a stable local-signing and installation workflow. On an M2 Mac with T23SS, updating preserved Bluetooth permission and the app reconnected and received a control acknowledgement. Actual logout/login startup, sleep/wake recovery and the complete error-UI matrix remain unverified.
+
 ### Features
 
 - Menu bar shows host temperature, connection state and selected mode; choose **Full speed** or **Automatic**.
@@ -156,7 +171,7 @@ I therefore analyzed its BLE protocol and built an independent native macOS cont
 - Configure manual, low-power, smart and strong-cooling modes, power, fan level and smart temperature settings.
 - Configure lighting effects, RGB, brightness, effect speed, fan lighting and side lighting.
 - View connection and control logs, with separate handling of GATT writes and device protocol acknowledgements.
-- No WeChat, browser, Python, cloud service or account required.
+- No WeChat, browser, Python, cloud service or account required at runtime. Initial local signing setup uses Python 3 and OpenSSL 3+.
 
 ### Compatibility and validation
 
@@ -165,6 +180,9 @@ I therefore analyzed its BLE protocol and built an independent native macOS cont
 | MacBook Air, Apple Silicon, macOS 26 | Build, launch, Bluetooth discovery and connection tested |
 | T23SS / M2023-S | Live status and successful cooling-command acknowledgement tested |
 | T23DD / M2023-D | Service matching implemented; hardware not yet tested |
+| M2 host temperature and two-mode control | Sensor readings, full-speed and automatic control acknowledgements tested |
+| Stable-signing update and automatic reconnect | 0.2.0 → 0.2.1 update retained Bluetooth permission and reconnected |
+| Login startup / sleep-wake recovery | Implemented; actual logout/login and sleep-wake recovery not yet verified |
 | Lighting controls | Implemented; individual physical effects not yet verified |
 | Other Macs / macOS versions | Not yet tested |
 
@@ -172,7 +190,7 @@ This is a personal project with no affiliation to TVVT. Compatibility is based o
 
 ### Build and test
 
-Requires macOS and Xcode Command Line Tools. The scripts build for the local machine architecture using the installed SDK. The tested environment is Apple Silicon running macOS 26.
+Requires macOS 14 or later and Xcode Command Line Tools. The scripts build for the local machine architecture using the installed SDK. The tested environment is Apple Silicon running macOS 26.
 
 ```sh
 # If Command Line Tools are not installed
@@ -188,6 +206,8 @@ cd TVVTNative
 open 'build/TVVT 散热器.app'
 ```
 
+Initial local signing setup also requires Python 3 and OpenSSL 3+ (`openssl version` must report version 3 or later; the macOS-bundled LibreSSL is not suitable).
+
 Without local signing setup, builds use ad hoc signatures and may prompt for Bluetooth again after rebuilding. For daily use, run `python3 scripts/setup-signing.py` once, approve the Keychain prompt locally, then use `./install.sh` for every update. Launch `/Applications/TVVT 散热器.app`.
 
 Setup creates a reusable local certificate trusted only for code signing in the user trust domain. The private key is imported into Keychain as non-extractable with codesign access; no signing secrets are committed. A missing configured identity fails the build instead of silently switching to ad hoc. The first migration from ad hoc signing may require one more Bluetooth grant. Stable identity normally preserves permissions across updates; OS resets, certificate replacement or expiry can still require approval. This is local self-signing, not Apple Developer ID signing or notarization.
@@ -196,9 +216,10 @@ Setup creates a reusable local certificate trusted only for code signing in the 
 
 1. Launch the app and allow Bluetooth access in macOS.
 2. Power on the cooler. Disconnect any phone Mini Program or other client currently using it.
-3. Click “搜索散热器” (Search), then “连接” (Connect) next to `T23SS` or `T23DD`.
-4. Wait for valid temperature and fan readings. Edit settings and click the corresponding “应用” (Apply) button; editing alone does not send a command.
-5. “从设备读取设置” (Read settings from device) copies the latest received status into the editable fields. It does not send an active query.
+3. On first launch, click “搜索散热器” (Search), then “连接” (Connect) next to your `T23SS` or `T23DD`. The app remembers the device only after receiving valid status; future launches reconnect to that device rather than choosing another of the same model.
+4. Click the menu bar fan icon and choose “全速前进” (Full speed) or “自动模式” (Automatic). Closing the control window keeps the app running; use “退出” (Quit) in the menu bar panel to exit.
+5. Wait for valid temperature and fan readings. Edit settings and click the corresponding “应用” (Apply) button; editing alone does not send a command. Applying manual cooling settings exits automatic control.
+6. “从设备读取设置” (Read settings from device) copies the latest received status into the editable fields. It does not send an active query.
 
 The app permits 36W requests and leaves hardware limits to the cooler firmware. A request, protocol ACK and reported setting are separate from measured physical output. Editable temperatures: −20…30°C cold-side and 40…60°C hot-side.
 
@@ -252,5 +273,7 @@ Sources/Protocol.swift   Command framing, status parsing and BLE reassembly
 Tests/main.swift         Protocol tests
 Tests/reference.json     Reference vectors generated by the original serializer
 build.sh                 Build and locally sign the app
-test.sh                  Compile and run protocol tests
+install.sh               Build and update the app in /Applications
+scripts/setup-signing.py Create and reuse a local signing identity
+test.sh                  Run protocol, cooling policy and connection tests
 ```
