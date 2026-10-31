@@ -3,7 +3,7 @@ id: menubar-cooling-modes
 seq: 1
 title: 菜单栏双模式与本机温控
 summary: 菜单栏提供全速前进与自动模式，根据本机温度调节散热
-brief: 菜单栏双模式及本机温控已实现，T23SS 已确认全速和自动请求；最终重签名后的蓝牙授权待系统解锁。
+brief: 固定本机签名及 Applications 安装路径已生效，更新重启后自动重连成功；实际注销登录和休眠恢复仍待验证。
 status: implementing
 type: feature
 base_commit: 60bb16105067a3583fe7b9b93b9bd39eba21e8ec

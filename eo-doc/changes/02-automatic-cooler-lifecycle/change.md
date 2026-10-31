@@ -3,7 +3,7 @@ id: automatic-cooler-lifecycle
 seq: 2
 title: 登录启动与设备自动重连
 summary: 登录自动运行，记住散热器并在断连或唤醒后恢复连接
-brief: 已注册登录启动并实现设备记忆与恢复；实际注销登录、休眠及最终签名下重连仍待验证。
+brief: 固定本机签名及 Applications 安装路径已生效，更新重启后自动重连成功；实际注销登录和休眠恢复仍待验证。
 status: implementing
 type: feature
 base_commit: 60bb16105067a3583fe7b9b93b9bd39eba21e8ec

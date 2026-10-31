@@ -57,7 +57,19 @@ cd TVVTNative
 open 'build/TVVT 散热器.app'
 ```
 
-应用采用本机临时签名（ad hoc），没有开发者证书或 Apple 公证。建议在自己的 Mac 上从源码构建；构建产物不纳入源码仓库。
+未配置本机证书时，构建使用临时签名（ad hoc），重新构建可能触发再次授权。日常使用建议配置固定的本机代码签名证书并安装到固定位置：
+
+```sh
+# 首次执行：按系统提示由本人完成钥匙串授权
+python3 scripts/setup-signing.py
+# 后续更新均执行此命令，复用同一证书和安装路径
+./install.sh
+open '/Applications/TVVT 散热器.app'
+```
+
+本机证书仅在用户级信任设置中用于代码签名，不添加 HTTPS 信任。私钥导入钥匙串时设为不可导出并限定 codesign 访问；公开证书及指纹配置保存在 `~/Library/Application Support/TVVTNative/Signing/`，不会提交仓库。已配置的证书不可用时构建会报错，不静默退回临时签名；请保留原证书，不为每次更新重新生成。`TVVT_SIGN_IDENTITY` 可显式选择其他已有签名身份，显式设为 `-` 仅用于临时调试，不用于日常安装。
+
+从旧的临时签名切换到固定证书后，macOS 可能还需要授权一次。固定证书通常能让后续更新保留授权，但系统重置权限、证书到期/更换、重装系统等仍可能要求重新允许。这不是 Apple Developer ID 签名或 Apple 公证，适合在自己的 Mac 上从源码构建自用。
 
 ### 使用
 
@@ -74,11 +86,11 @@ open 'build/TVVT 散热器.app'
 
 本机摄氏温度映射目前仅支持 M2 系列；其他芯片显示不可用，仍可使用全速和原手动控制。不会用散热器温度、电池温度或系统热压力冒充芯片温度。
 
-登录启动使用系统 `SMAppService`。从固定位置运行应用，菜单栏可查看是否“已启用 / 等待系统批准 / 注册失败”；需要时在“登录项设置”允许。仅注册成功不代表实际注销后启动已验证。当前 ad hoc 签名和应用路径变化可能影响系统批准状态。主动断开会跨睡眠唤醒保持暂停，手动恢复连接或重新启动应用后解除。
+登录启动使用系统 `SMAppService`。从固定位置运行应用，菜单栏可查看是否“已启用 / 等待系统批准 / 注册失败”；需要时在“登录项设置”允许。仅注册成功不代表实际注销后启动已验证。固定签名版本安装到 `/Applications` 后会迁移登录项路径；应用路径或证书变化仍可能影响系统批准状态。主动断开会跨睡眠唤醒保持暂停，手动恢复连接或重新启动应用后解除。
 
 ### 蓝牙故障排查
 
-- **权限被拒绝或一直等待授权**：在系统设置 → 隐私与安全性 → 蓝牙中允许应用。重新构建的 ad hoc 签名可能需要重新授权；若列表已开启但仍卡住，需由本机用户解锁设置、刷新该应用权限后重新打开。应用不会自行绕过系统授权。
+- **权限被拒绝或一直等待授权**：在系统设置 → 隐私与安全性 → 蓝牙中允许应用。重新构建的 ad hoc 签名可能需要重新授权，建议按上文配置固定证书；若列表已开启但仍卡住，需由本机用户解锁设置、刷新该应用权限后重新打开。应用不会自行绕过系统授权。
 - **搜索不到设备**：确认散热器通电，并断开手机小程序或其他客户端。
 - **`Peer removed pairing information`**：Mac 的旧配对信息与设备不一致。在系统设置 → 蓝牙 → 对应散热器的详情中选择“忽略此设备”，然后重新搜索连接。本项目在 T23SS 上已验证此方法有效。
 - **未收到设备确认**：3 秒内没有协议 ACK 会显示未确认；这与系统接受了蓝牙写入不是同一个结果。
@@ -176,7 +188,9 @@ cd TVVTNative
 open 'build/TVVT 散热器.app'
 ```
 
-The app is signed ad hoc locally, without a developer certificate or Apple notarization. Building from source on your own Mac is recommended. Build artifacts are excluded from the source repository.
+Without local signing setup, builds use ad hoc signatures and may prompt for Bluetooth again after rebuilding. For daily use, run `python3 scripts/setup-signing.py` once, approve the Keychain prompt locally, then use `./install.sh` for every update. Launch `/Applications/TVVT 散热器.app`.
+
+Setup creates a reusable local certificate trusted only for code signing in the user trust domain. The private key is imported into Keychain as non-extractable with codesign access; no signing secrets are committed. A missing configured identity fails the build instead of silently switching to ad hoc. The first migration from ad hoc signing may require one more Bluetooth grant. Stable identity normally preserves permissions across updates; OS resets, certificate replacement or expiry can still require approval. This is local self-signing, not Apple Developer ID signing or notarization.
 
 ### Usage
 
@@ -190,7 +204,7 @@ The app permits 36W requests and leaves hardware limits to the cooler firmware. 
 
 Automatic mode uses the maximum valid M2 CPU/GPU sensor reading, sampled every two seconds: below 55°C requests 10W/fan 4, 55–below 70°C requests 18W/fan 7, and 70°C or above requests 36W/fan 10. Downshifts require a 5°C margin sustained for 20 seconds. Invalid or stale readings (over six seconds) pause automatic writes and retain the last device setting. Full speed operates independently of host temperature. Host sensor mapping currently supports M2-family chips only.
 
-The app runs in the menu bar; its panel opens the existing control window. Applying manual cooling settings exits automatic control. Closing the window keeps the app running. Login startup uses SMAppService; check the panel for system approval or registration failures. Keep the app at a stable path. Actual logout/login startup requires separate verification; ad hoc signatures and moving the app may affect approval.
+The app runs in the menu bar; its panel opens the existing control window. Applying manual cooling settings exits automatic control. Closing the window keeps the app running. Login startup uses SMAppService; check the panel for system approval or registration failures. Keep the app at a stable path. Actual logout/login startup requires separate verification; moving the app or replacing its signing certificate may affect approval. Installation migrates the login item to the fixed /Applications path.
 
 The interface is currently in Chinese; this README documents it in both languages.
 

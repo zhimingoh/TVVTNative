@@ -11,6 +11,17 @@ final class LoginItemController: ObservableObject {
         if !defaults.bool(forKey: "loginRegistrationAttempted") {
             defaults.set(true, forKey: "loginRegistrationAttempted")
             register()
+        } else if Bundle.main.bundleURL.path == "/Applications/TVVT 散热器.app",
+                  defaults.string(forKey: "loginRegisteredBundlePath") != Bundle.main.bundleURL.path {
+            do {
+                if SMAppService.mainApp.status == .enabled || SMAppService.mainApp.status == .requiresApproval {
+                    try SMAppService.mainApp.unregister()
+                }
+                register()
+            } catch {
+                refresh()
+                status = "登录项路径更新失败：\(error.localizedDescription)"
+            }
         }
     }
     func refresh() {
@@ -23,7 +34,11 @@ final class LoginItemController: ObservableObject {
         }
     }
     func register() {
-        do { try SMAppService.mainApp.register(); refresh() }
+        do {
+            try SMAppService.mainApp.register()
+            defaults.set(Bundle.main.bundleURL.path, forKey: "loginRegisteredBundlePath")
+            refresh()
+        }
         catch { refresh(); status = "登录启动注册失败：\(error.localizedDescription)" }
     }
     func openSettings() { SMAppService.openSystemSettingsLoginItems() }
