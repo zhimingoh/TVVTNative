@@ -16,6 +16,10 @@
 
 ### 功能
 
+- Mac 顶部菜单栏显示本机芯片温度、连接状态和当前模式，点击即可切换“全速前进 / 自动模式”。
+- 全速前进请求 36W、最高风扇；自动模式按本机温度调整 10W / 18W / 36W。
+- 首次选定散热器后记住设备，启动、意外断连及睡眠唤醒后自动重连；主动断开会暂停重连。
+- 首次启动尝试注册系统登录项，支持查看注册状态和进入系统登录项设置。
 - 搜索并连接已知 TVVT 名称或服务的 BLE 设备。
 - 实时显示冷面温度、热面温度、风扇转速、核芯电压和当前模式。
 - 设置手动、低功耗、智能、强冷模式，以及功率、风扇档位和智能温度。
@@ -59,19 +63,26 @@ open 'build/TVVT 散热器.app'
 
 1. 启动应用，允许 macOS 蓝牙访问。
 2. 给散热器通电；若手机或其他应用已经连接，请先断开。
-3. 点击“搜索散热器”，找到 `T23SS` 或 `T23DD` 后点击“连接”。
-4. 等待温度、转速等有效状态出现，再调整设置并点击相应的“应用”按钮。编辑设置不会立即发送。
-5. “从设备读取设置”会把最近收到的设备状态同步到编辑项，不会主动发送查询指令。
+3. 首次运行会显示控制面板，点击“搜索散热器”，找到你的 `T23SS` 或 `T23DD` 后点击“连接”。成功收到状态后才记住此设备；以后自动连接同一设备，不按型号盲选其他设备。
+4. 点击顶部菜单栏风扇图标选择“全速前进”或“自动模式”。关闭控制窗口不退出应用；退出请使用菜单栏面板的“退出”。
+5. 等待温度、转速等有效状态出现，再调整设置并点击相应的“应用”按钮。应用手动制冷设置会退出自动接管；编辑设置不会立即发送。
+6. “从设备读取设置”会把最近收到的设备状态同步到编辑项，不会主动发送查询指令。
 
-36W 保留了原小程序的供电条件：设备须报告 12V 供电检测结果，并勾选已安装水冷增强组件。温度编辑范围采用保守设计：冷面目标 −20…30℃，热面上限 40…60℃。
+应用允许发送 36W 请求，供电与附件限制交由设备固件处理；请求成功不代表实际物理输出已达到 36W。面板分别显示请求、协议确认和设备报告的档位，不将档位当作实测功率。温度编辑范围：冷面目标 −20…30℃，热面上限 40…60℃。
+
+自动模式每 2 秒采集 M2 芯片传感器温度，使用有效 CPU/GPU 读数的最高值：低于 55℃ 请求 10W / 风扇 4，55～不足 70℃ 请求 18W / 风扇 7，70℃起请求 36W / 风扇 10。降档需低于对应阈值 5℃并持续 20 秒。读数无效或超过 6 秒时暂停新自动请求、保留设备最后设置并提示；全速不依赖本机温度。
+
+本机摄氏温度映射目前仅支持 M2 系列；其他芯片显示不可用，仍可使用全速和原手动控制。不会用散热器温度、电池温度或系统热压力冒充芯片温度。
+
+登录启动使用系统 `SMAppService`。从固定位置运行应用，菜单栏可查看是否“已启用 / 等待系统批准 / 注册失败”；需要时在“登录项设置”允许。仅注册成功不代表实际注销后启动已验证。当前 ad hoc 签名和应用路径变化可能影响系统批准状态。主动断开会跨睡眠唤醒保持暂停，手动恢复连接或重新启动应用后解除。
 
 ### 蓝牙故障排查
 
-- **权限被拒绝**：在系统设置 → 隐私与安全性 → 蓝牙中允许应用。
+- **权限被拒绝或一直等待授权**：在系统设置 → 隐私与安全性 → 蓝牙中允许应用。重新构建的 ad hoc 签名可能需要重新授权；若列表已开启但仍卡住，需由本机用户解锁设置、刷新该应用权限后重新打开。应用不会自行绕过系统授权。
 - **搜索不到设备**：确认散热器通电，并断开手机小程序或其他客户端。
 - **`Peer removed pairing information`**：Mac 的旧配对信息与设备不一致。在系统设置 → 蓝牙 → 对应散热器的详情中选择“忽略此设备”，然后重新搜索连接。本项目在 T23SS 上已验证此方法有效。
 - **未收到设备确认**：3 秒内没有协议 ACK 会显示未确认；这与系统接受了蓝牙写入不是同一个结果。
-- **状态超时**：5 秒没有新状态会禁用控制，请重新连接。
+- **状态超时**：5 秒没有新状态会停止控制并重连；意外断连按 2～60 秒退避重试，手机占用、蓝牙关闭或权限拒绝时不会假报已连接。
 
 日志位于 `~/Library/Application Support/TVVTNative/session.log`，每次启动重新建立。日志可能包含设备标识与控制设置，提交问题时请先检查内容。
 
@@ -99,7 +110,12 @@ T23SS 实测通知特征支持 `read + notify`，控制特征支持 `read + writ
 ### 项目结构
 
 ```text
-Sources/App.swift        SwiftUI 界面与 CoreBluetooth 连接管理
+Sources/App.swift        共享控制模型、原控制窗口与 BLE 管理
+Sources/MenuBar.swift    原生菜单栏与弹出面板、窗口生命周期
+Sources/CoolingPolicy.swift 温控回差、双模式与请求去重
+Sources/TemperatureMonitor.swift M2 只读温度采集
+Sources/ConnectionCoordinator.swift 设备身份、暂停和重试状态机
+Sources/LoginItemController.swift 系统登录项状态与注册
 Sources/Protocol.swift   控制帧、状态解析与 BLE 分片处理
 Tests/main.swift         协议测试
 Tests/reference.json     原序列化函数生成的协议测试向量
@@ -119,6 +135,10 @@ I therefore analyzed its BLE protocol and built an independent native macOS cont
 
 ### Features
 
+- Menu bar shows host temperature, connection state and selected mode; choose **Full speed** or **Automatic**.
+- Full speed requests 36W and fan level 10; automatic mode selects 10W/4, 18W/7 or 36W/10 based on host temperature.
+- Remember the selected peripheral and reconnect after launch, unexpected disconnect and wake. Explicit disconnect pauses reconnection until manual resume or app restart.
+- Register a macOS login item and expose its enabled, approval-pending or failed state.
 - Discover and connect to BLE peripherals matching known TVVT names or services.
 - Display cold-side and hot-side temperature, fan RPM, core voltage and current mode.
 - Configure manual, low-power, smart and strong-cooling modes, power, fan level and smart temperature settings.
@@ -166,7 +186,11 @@ The app is signed ad hoc locally, without a developer certificate or Apple notar
 4. Wait for valid temperature and fan readings. Edit settings and click the corresponding “应用” (Apply) button; editing alone does not send a command.
 5. “从设备读取设置” (Read settings from device) copies the latest received status into the editable fields. It does not send an active query.
 
-36W retains the original supply requirement: the cooler must report a 12V supply-detection result, and the water-cooling accessory checkbox must be selected. Editable temperatures use conservative ranges: −20…30°C for the cold-side target and 40…60°C for the hot-side limit.
+The app permits 36W requests and leaves hardware limits to the cooler firmware. A request, protocol ACK and reported setting are separate from measured physical output. Editable temperatures: −20…30°C cold-side and 40…60°C hot-side.
+
+Automatic mode uses the maximum valid M2 CPU/GPU sensor reading, sampled every two seconds: below 55°C requests 10W/fan 4, 55–below 70°C requests 18W/fan 7, and 70°C or above requests 36W/fan 10. Downshifts require a 5°C margin sustained for 20 seconds. Invalid or stale readings (over six seconds) pause automatic writes and retain the last device setting. Full speed operates independently of host temperature. Host sensor mapping currently supports M2-family chips only.
+
+The app runs in the menu bar; its panel opens the existing control window. Applying manual cooling settings exits automatic control. Closing the window keeps the app running. Login startup uses SMAppService; check the panel for system approval or registration failures. Keep the app at a stable path. Actual logout/login startup requires separate verification; ad hoc signatures and moving the app may affect approval.
 
 The interface is currently in Chinese; this README documents it in both languages.
 
@@ -176,7 +200,7 @@ The interface is currently in Chinese; this README documents it in both language
 - **No device found:** check cooler power and disconnect other clients.
 - **`Peer removed pairing information`:** the Mac holds pairing information that no longer matches the device. Open the cooler’s details under System Settings → Bluetooth, select “Forget This Device”, then search and connect again. This recovery was verified with T23SS.
 - **No device acknowledgement:** a missing protocol ACK after three seconds is reported as unconfirmed. A GATT write being accepted by the OS is a separate result.
-- **Stale status:** controls are disabled after five seconds without fresh status; reconnect the cooler.
+- **Stale status:** after five seconds without fresh status, controls stop and the app reconnects. Unexpected disconnects retry with bounded backoff (2–60 seconds).
 
 Logs are stored at `~/Library/Application Support/TVVTNative/session.log` and recreated on each launch. Check for device identifiers and control settings before attaching logs to an issue.
 
@@ -204,7 +228,12 @@ The repository contains the independent Swift implementation and protocol test v
 ### Project layout
 
 ```text
-Sources/App.swift        SwiftUI interface and CoreBluetooth connection management
+Sources/App.swift        Shared control model, window and BLE management
+Sources/MenuBar.swift    Native menu bar, popover and window lifecycle
+Sources/CoolingPolicy.swift Temperature policy and command gate
+Sources/TemperatureMonitor.swift Read-only M2 sensor sampling
+Sources/ConnectionCoordinator.swift Reconnect identity, pause and backoff
+Sources/LoginItemController.swift System login item registration
 Sources/Protocol.swift   Command framing, status parsing and BLE reassembly
 Tests/main.swift         Protocol tests
 Tests/reference.json     Reference vectors generated by the original serializer

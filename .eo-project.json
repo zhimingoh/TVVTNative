@@ -1,0 +1,15 @@
+{
+  "project_name": "TVVTNative",
+  "mode": "local",
+  "project_root": "/Users/ouou/Documents/Project/TVVTNative/.eo-project",
+  "doc_root": "eo-doc",
+  "kanban_path": null,
+  "sync": {
+    "github": {
+      "enabled": false
+    }
+  },
+  "state": {
+    "enabled": false
+  }
+}

@@ -2,6 +2,7 @@ import Foundation
 
 enum TVVTProtocol {
     static let services = ["00010203-0405-0607-0809-0A0B0C0D1910", "00010203-0405-0607-0809-0A0B0C0D1909"]
+    static let statusUUID = "00010203-0405-0607-0809-0A0B0C0D2B10"
     static let writeUUID = "00010203-0405-0607-0809-0A0B0C0D2B11"
     static func packet(_ command: UInt8, _ payload: [UInt8]) -> Data {
         let bytes = [command, UInt8(payload.count)] + payload
